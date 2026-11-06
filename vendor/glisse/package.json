@@ -1,0 +1,14 @@
+{
+  "name": "glisse-vanilla",
+  "version": "0.5.0",
+  "description": "Vendored Glisse (Apple Liquid Glass) runtime for Lumen's vanilla-JS panel. Ported from https://github.com/0kzh/glisse",
+  "type": "module",
+  "main": "glisse.js",
+  "exports": {
+    ".": "./glisse.js",
+    "./styles.css": "./styles.css",
+    "./lens-map-core.mjs": "./lens-map-core.mjs"
+  },
+  "license": "MIT",
+  "author": "Kelvin Zhang (upstream); EM Labs (vanilla port)"
+}
