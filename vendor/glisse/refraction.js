@@ -125,14 +125,34 @@ function visibleBox(el) {
   return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
 }
 
+/**
+ * The element that painted the page behind the glass.
+ *
+ * Upstream walks ancestors and looks for a marked element among their
+ * descendants. A panel whose backdrop is a *sibling* layer (`.bg`, the
+ * painted page background) is never reached by that walk, so this port also
+ * accepts an explicit backdrop: `data-glisse-backdrop` on the glass itself
+ * names the selector to bend. Without it, the ancestor walk is used, which is
+ * exactly upstream's behaviour.
+ */
 function findBackdrop(el) {
   const box = el.getBoundingClientRect();
+  const named = el.getAttribute(MARK);
+  if (named) {
+    try {
+      const target = document.querySelector(named);
+      if (target && target !== el) return target;
+      // A named backdrop that is genuinely absent falls back to the page
+      // background, which the panel always paints.
+      if (document.body.hasAttribute(MARK)) return document.body;
+    } catch (_) { /* not a valid selector: fall through to the ancestor walk */ }
+  }
   const behind = candidate => {
     if (candidate.contains(el) || el.contains(candidate)) return false;
     const other = visibleBox(candidate);
     return other.left < box.right && other.right > box.left && other.top < box.bottom && other.bottom > box.top;
   };
-  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+  for (let node = el.parentElement; node; node = node.parentElement) {
     const found = [...node.querySelectorAll(`[${MARK}]`)].find(behind);
     if (found) return found;
   }

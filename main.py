@@ -957,31 +957,43 @@ GLISSE_MEDIA = {
 }
 
 
-def _read_glisse(name: str) -> bytes | None:
-    """Read a vendored asset by its base name, or None when absent."""
+def _resolve_glisse(name: str) -> tuple[Path, bytes] | None:
+    """Resolve a vendored asset by its real file name, or None when absent.
+
+    The name arrives as the panel requests it — `styles.css`, `components.js`,
+    `lens-map-core.mjs` — so the extension is part of the name and must be
+    preserved. Anything that is not exactly one file inside the vendored
+    directory, or that escapes it, is refused.
+    """
+    requested = str(name or "")
+    if not requested or "/" in requested or "\\" in requested or requested.startswith("."):
+        return None
+    safe = "".join(ch for ch in requested if ch.isalnum() or ch in ".-_")[:80]
+    if safe != requested:
+        return None
     try:
-        for candidate in GLISSE_DIR.iterdir():
-            if candidate.stem == name and candidate.suffix in GLISSE_MEDIA:
-                return candidate.read_bytes()
+        base = GLISSE_DIR.resolve()
+        candidate = (base / safe).resolve()
+        if candidate.parent != base or not candidate.is_file():
+            return None
     except OSError:
         return None
-    return None
+    if candidate.suffix not in GLISSE_MEDIA:
+        return None
+    try:
+        return candidate, candidate.read_bytes()
+    except OSError:
+        return None
 
 
 @app.get("/glisse/{name}", include_in_schema=False)
 async def glisse_asset(name: str):
-    safe = "".join(ch for ch in str(name or "") if ch.isalnum() or ch in "-_")[:80]
-    if not safe:
+    resolved = _resolve_glisse(name)
+    if resolved is None:
         raise HTTPException(status_code=404, detail="not found")
-    payload = _read_glisse(safe)
-    if payload is None:
-        raise HTTPException(status_code=404, detail="not found")
-    media = GLISSE_MEDIA[next(
-        c.suffix for c in GLISSE_DIR.iterdir()
-        if c.stem == safe and c.suffix in GLISSE_MEDIA
-    )]
+    candidate, payload = resolved
     return Response(
-        content=payload, media_type=media,
+        content=payload, media_type=GLISSE_MEDIA[candidate.suffix],
         headers={"Cache-Control": "public, max-age=86400, immutable"},
     )
 

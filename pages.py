@@ -216,7 +216,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Glisse: Apple Liquid Glass, vendored from glisse@0.5.0 (MIT, Kelvin Zhang).
      The library's own stylesheet plus the framework-free runtime ported from its
      source into /vendor/glisse. Every panel surface is a Lens over the backdrop. -->
-<link rel="stylesheet" href="/glisse/styles">
+<link rel="stylesheet" href="/glisse/styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -989,6 +989,23 @@ body{font-size:14.5px}
     radial-gradient(760px 620px at 68% 108%, color-mix(in srgb, var(--amber) 16%, transparent), transparent 70%),
     var(--bg);
 }
+
+/* ── Dashboard backdrop — what every glass surface bends ── */
+.gl-backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:var(--bg)}
+.gl-blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;will-change:transform}
+.gl-blob.b1{width:52vw;height:52vw;left:-14vw;top:-18vw;background:color-mix(in srgb,var(--accent) 30%,transparent);animation:gl-drift-a 26s ease-in-out infinite alternate}
+.gl-blob.b2{width:44vw;height:44vw;right:-12vw;top:-6vw;background:color-mix(in srgb,var(--purple) 26%,transparent);animation:gl-drift-b 32s ease-in-out infinite alternate}
+.gl-blob.b3{width:38vw;height:38vw;left:34vw;bottom:-16vw;background:color-mix(in srgb,var(--amber) 18%,transparent);animation:gl-drift-a 38s ease-in-out infinite alternate-reverse}
+.gl-grid{position:absolute;inset:0;background-image:linear-gradient(color-mix(in srgb,var(--accent) 6%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--accent) 6%,transparent) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:linear-gradient(160deg,#000,transparent 76%);mask-image:linear-gradient(160deg,#000,transparent 76%)}
+@keyframes gl-drift-a{to{transform:translate3d(5vw,4vh,0) scale(1.12)}}
+@keyframes gl-drift-b{to{transform:translate3d(-4vw,6vh,0) scale(1.08)}}
+/* The panel chrome sits above the backdrop. Only `main` needs a stacking
+   context of its own — the sidebar is position:fixed with its own high
+   z-index, and `.main` is the scrolling column, so neither must be changed
+   to `relative` or the mobile dock stops being a fixed overlay. */
+.main{position:relative;z-index:1}
+.overlay{z-index:1}
+@media(prefers-reduced-motion:reduce){.gl-blob{animation:none}}
 .grid{
   background-image:
     linear-gradient(color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px),
@@ -1022,8 +1039,7 @@ body{font-size:14.5px}
 .nav-it:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sb-foot .lang-switch,.sb-foot .theme-btn,.sb-foot .logout-btn{border-radius:var(--lg-radius-pill)}
 
-/* ── Cards and metric tiles: the primary data surfaces ── */
-.card,.metric,.vless-box,.srv-panel,.pw-panel,.update-credentials,.traf-hero,
+/* ── Cards and metric tiles: the primary data surfaces ── */.settings-panel,.card,.metric,.vless-box,.srv-panel,.pw-panel,.update-credentials,.traf-hero,
 .conn-hero-tile,.cp-block,.proxy-mode-card,.cp-create-wrap,.sub-card,.cfg-card{
   background:color-mix(in srgb, var(--card) 76%, transparent);
   border:1px solid color-mix(in srgb, var(--accent) 16%, transparent);
@@ -1345,6 +1361,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 </style>
 </head>
 <body>
+<!-- Glisse backdrop: the painted page every glass surface bends. One layer,
+     deliberately quiet, so refraction is visible without competing with data. -->
+<div class="gl-backdrop" aria-hidden="true">
+  <span class="gl-blob b1"></span>
+  <span class="gl-blob b2"></span>
+  <span class="gl-blob b3"></span>
+  <span class="gl-grid"></span>
+</div>
 <div class="toast" id="toast"></div>
 <div class="modal-bg" id="modal-links">
   <div class="modal-v2" style="max-width:500px">
@@ -1434,7 +1458,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
         </div>
         <div class="ml-loc-head">
           <span><i class="ti ti-map-pins"></i> Locations <span class="ml-loc-count" id="ml-loc-count">0</span></span>
-          <span class="ml-loc-hint">Exactly two · user choice only · no failover</span>
+          <span class="ml-loc-hint" id="ml-limit-hint">— · user choice only · no failover</span>
         </div>
         <div class="ml-loc-list" id="ml-loc-list"></div>
         <div class="ml-add">
@@ -1468,6 +1492,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
     <div class="form-row" style="margin-bottom:13px">
       <div class="fg" style="flex:1"><label>Address (IPv4 / IPv6 / domain)</label><input class="fi endpoint-ltr" id="el-address" placeholder="Empty = current service" style="width:100%"></div>
       <div class="fg" style="flex:1"><label>TLS SNI (domain only)</label><input class="fi endpoint-ltr" id="el-sni" placeholder="Empty = automatic" style="width:100%"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:13px">
+      <div class="fg" style="flex:1"><label>SNI mode</label><select class="fs" id="el-sni-mode" style="width:100%"><option value="auto">Auto — derive from the address</option><option value="off">Empty — leave the SNI unset</option></select></div>
+      <div class="fg" style="flex:1"><label>WS host</label><input class="fi endpoint-ltr" value="current service (never changed by SNI)" disabled style="width:100%;opacity:.6"></div>
     </div>
     <div class="fg config-proxy-edit" style="margin-bottom:13px"><label>Exit IP settings</label><select class="fs" id="el-exit-mode" onchange="syncExitProxy('el')" style="width:100%"><option value="direct">Direct — safest default</option><option value="repository">Managed proxy repository</option><option value="custom">Custom proxy — unsafe</option></select><div id="el-repository-fields" style="display:none;margin-top:9px"><select class="fs" id="el-proxy-id" onchange="proxySelectionChanged('el')" style="width:100%"></select><div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn btn-o btn-sm" id="el-proxy-test" onclick="testSelectedProxy('el')"><i class="ti ti-shield-check"></i> Test selected proxy</button><span class="managed-safe" id="el-proxy-test-status">Test required</span></div><div class="proxy-test-detail" id="el-proxy-test-detail"></div></div><div id="el-custom-fields" style="display:none;margin-top:9px"><input class="fi endpoint-ltr" id="el-custom-proxy" placeholder="http://user:pass@host:port" style="width:100%"><div class="field-caption" style="color:var(--md-sys-color-error)"><i class="ti ti-alert-triangle"></i> Unsafe custom proxy; configuration may fail or traffic may be exposed.</div></div></div>
     <div class="form-row" style="margin-bottom:13px">
@@ -1726,7 +1754,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
             <div class="endpoint-custom" id="nl-sni-custom-row" style="display: none">
               <input class="cp-input-full endpoint-ltr" id="nl-sni-custom" autocomplete="off" spellcheck="false" placeholder="front.example.com" oninput="updateEndpointPreview()">
             </div>
-            <div class="endpoint-help">SNI must be a domain. With a raw IP address, Auto keeps the service domain for TLS.</div>
+            <div class="endpoint-custom" id="nl-sni-off-row" style="display:none">
+              <div class="sni-off-note"><i class="ti ti-alert-triangle"></i><span>Deliberately empty — the SNI is never derived from the dial address or the WS host.</span></div>
+            </div>
+            <div class="endpoint-help">SNI must be a domain. With a raw IP address, Auto keeps the service domain for TLS. SNI never changes the WS host.</div>
+          </div>
+          <div class="endpoint-field">
+            <label for="nl-sni-mode"><span class="step-dot">3</span> SNI mode</label>
+            <select class="cp-input-full fs endpoint-ltr" id="nl-sni-mode" onchange="sniModeChanged()">
+              <option value="auto">Auto — derive from the dial address</option>
+              <option value="off">Empty — leave the SNI unset</option>
+            </select>
+            <div class="endpoint-help">A non-empty SNI above always wins. "Empty" keeps the SNI genuinely blank in the generated URI.</div>
           </div>
         </div>
         <div class="endpoint-preview" id="endpoint-preview">
@@ -2030,6 +2069,61 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
           <button class="pw-eye" type="button" onclick="togglePwField('cp-cf',this)"><i class="ti ti-eye"></i></button>
         </div>
         <button class="pw-submit" onclick="changePw()"><i class="ti ti-shield-check"></i> Save new password</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="settings-defaults-panel">
+    <div class="pw-hero">
+      <div class="pw-hero-icon"><i class="ti ti-adjustments-horizontal"></i></div>
+      <div class="pw-hero-text">
+        <div class="pw-hero-title">Default Config Defaults</div>
+        <div class="pw-hero-sub">These defaults apply to every newly created config unless overridden</div>
+      </div>
+    </div>
+    <div class="pw-body">
+      <div class="pw-field">
+        <label>Max locations per subscription</label>
+        <select class="pw-input fs" id="settings-max-locations">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+      <div class="pw-field">
+        <label>Default exit proxy mode</label>
+        <select class="pw-input fs" id="settings-exit-mode">
+          <option value="direct">Direct — no exit proxy</option>
+          <option value="repository">Managed proxy repository</option>
+          <option value="custom">Custom proxy URL</option>
+        </select>
+      </div>
+      <div class="pw-field" id="settings-repository-fields" style="display: none">
+        <label>Default managed proxy</label>
+        <select class="pw-input fs" id="settings-proxy-id"></select>
+      </div>
+      <div class="pw-field" id="settings-custom-fields" style="display: none">
+        <label>Default custom proxy URL</label>
+        <input class="pw-input endpoint-ltr" id="settings-custom-proxy" placeholder="socks5://user:pass@host:port">
+      </div>
+      <div class="pw-field">
+        <label>Telegram default exit proxy</label>
+        <select class="pw-input fs" id="settings-telegram-proxy"></select>
+      </div>
+      <div class="pw-field">
+        <label>Telegram dial address base (optional)</label>
+        <input class="pw-input endpoint-ltr" id="settings-telegram-dial-base" placeholder="relay.example.com">
+        <div class="field-caption">If set, new Telegram users get <code>{slug}.{base}</code> as their Dial Address. Empty uses the service host.</div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-p" id="settings-save-btn" onclick="saveSettings()"><i class="ti ti-device-floppy"></i> Save defaults</button>
       </div>
     </div>
   </div>
@@ -2626,7 +2720,9 @@ function requestGlassLayer(){
   glassLayerRequested=true;
   const s=document.createElement('script');
   s.type='module';
-  s.textContent="import('/glisse/glisse').then(m=>{window.__glisseModule=m;window.__glisse.ready=true;document.dispatchEvent(new CustomEvent('glisse:ready'))}).catch(()=>{window.__glisse.ready=false})";
+  // Dispatch on BOTH window and document: some listeners are registered on one,
+  // some on the other, and a single dispatch only reaches its own target.
+  s.textContent="import('/glisse/glisse.js').then(m=>{window.__glisseModule=m;window.__glisse.ready=true;const fire=o=>o.dispatchEvent(new CustomEvent('glisse:ready',{bubbles:true}));if(window!==document)fire(window);fire(document)}).catch(()=>{window.__glisse.ready=false})";
   document.head.append(s);
 }
 // Request it now but never block the panel on it: if it fails to load the
@@ -2634,11 +2730,34 @@ function requestGlassLayer(){
 // glass look rather than losing any functionality.
 requestGlassLayer();
 
+/* Register the ready listener here — before any glass surface exists — so the
+   late pass can re-arm surfaces marked by an earlier pass that ran with no
+   module. Registered early because glisse:ready can fire within ~1s. */
+window.addEventListener('glisse:ready',()=>{
+  try{
+    document.querySelectorAll('[data-gl-is-glass]').forEach(el=>{if(!el.__glisse)el.removeAttribute('data-gl-is-glass')});
+    document.querySelectorAll('.lg-glass').forEach(el=>{delete el.__glIsGlass});
+    if(typeof applyLiquidGlass==='function')applyLiquidGlass();
+    if(typeof markBackdrops==='function')markBackdrops();
+    if(typeof refitGlass==='function')refitGlass();
+  }catch(_){}
+});
+
 /* Mark the page backdrop behind the panel chrome so every glass surface has
-   something to bend. The dashboard's own painted background is the backdrop. */
+   something to bend. `.bg` is the painted page background and a *sibling* of
+   the content, so it is named on each glass surface rather than found by
+   walking ancestors (which can only see ancestors). */
 function markBackdrops(){
-  const seats=[document.querySelector('.bg'),document.body];
-  seats.forEach(el=>{if(el&&!el.hasAttribute('data-glisse-backdrop'))el.setAttribute('data-glisse-backdrop','')});
+  const bg=document.querySelector('.gl-backdrop')||document.querySelector('.bg');
+  if(bg)bg.setAttribute('data-glisse-backdrop','');
+  document.body.setAttribute('data-glisse-backdrop','');
+  document.querySelectorAll('.lg-glass').forEach(el=>nameGlassBackdrop(el));
+}
+/* A surface created after the first pass needs the backdrop named on it too. */
+function nameGlassBackdrop(el){
+  if(!el||el.hasAttribute('data-glisse-backdrop'))return;
+  const bg=document.querySelector('.gl-backdrop')||document.querySelector('.bg');
+  el.setAttribute('data-glisse-backdrop', bg ? '.'+(bg.classList[0]||'gl-backdrop') : 'body');
 }
 
 /* Give one existing element the Liquid Glass treatment, in place.
@@ -2856,6 +2975,8 @@ async function loadProxyCatalog(){
     scheduleProxyRetry(st);
     ['nl-proxy-id','el-proxy-id'].forEach(id=>{const e=document.getElementById(id);if(!e)return;const old=e.value;e.innerHTML='<option value="">— Choose managed proxy —</option>'+managedProxyCatalog.map(managedOption).join('');if(managedProxyCatalog.some(p=>p.id===old))e.value=old;showProxyTestResult(id.slice(0,2),e.value)});
     if(typeof mlCatalogUpdated==='function')mlCatalogUpdated();
+    // The settings page's proxy dropdowns read from this same catalog.
+    if(typeof currentSettings!=='undefined'&&currentSettings&&typeof loadSettings==='function')loadSettings();
   }catch(e){
     // Keep the last known list; transient failures retry quietly in the background.
     renderRepoStatus(proxyRepoState==='ready'?'stale':'error');
@@ -2878,6 +2999,73 @@ async function testAllManagedProxies(countryCode=''){
   try{const r=await authF('/api/proxy-catalog/test-all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(countryCode?{country_code:countryCode}:{})},{retries:0,timeoutMs:10000});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.detail||'Could not start proxy tests');toast(d.deduplicated?'Proxy tests are already running':'Testing every proxy through its exact route','ok');await loadProxyCatalog();return true}catch(e){toast(e.message||'Could not start proxy tests','err');return false}finally{if(button)button.disabled=false}
 }
 function exitProxyValues(prefix){const proxy_id=document.getElementById(prefix+'-proxy-id')?.value||'';const state=proxyTestState[prefix]||{};return {exit_proxy_mode:document.getElementById(prefix+'-exit-mode')?.value||'direct',proxy_id,custom_proxy:document.getElementById(prefix+'-custom-proxy')?.value.trim()||'',proxy_test_receipt:state.id===proxy_id?state.receipt:''}}
+
+/* ===== Admin Settings (defaults) ===== */
+let currentSettings=null;
+function settingsModeChanged(){
+  const mode=document.getElementById('settings-exit-mode').value;
+  const repo=document.getElementById('settings-repository-fields');
+  const custom=document.getElementById('settings-custom-fields');
+  if(repo)repo.style.display=mode==='repository'?'':'none';
+  if(custom)custom.style.display=mode==='custom'?'':'none';
+}
+async function loadSettings(){
+  try{
+    const r=await authF('/api/settings');
+    const s=await r.json();
+    if(!r.ok)throw new Error(s.detail||'Could not load settings');
+    currentSettings=s;
+    const limit=Number(s.max_subscription_locations||2);
+    const loc=document.getElementById('settings-max-locations');
+    if(loc)loc.value=String(limit);
+    /* The Multi-Location modal reads the limit from here, not from a literal. */
+    const hint=document.getElementById('ml-limit-hint');
+    if(hint)hint.textContent=(uiLang==='fa'?('حداکثر '+toFa(limit)+' لوکیشن'):('Up to '+limit+' locations'))+' · '+(uiLang==='fa'?'انتخاب کاربر · بدون جایگزینی':'user choice only · no failover');
+    const mlSub=document.querySelector('.ml-switch-sub');
+    if(mlSub)mlSub.textContent=uiLang==='fa'
+      ? ('حداکثر '+toFa(limit)+' کشور یک UUID و یک سهمیه را به اشتراک می‌گذارند. هر کشور از سلامت‌ترین پروکسی خود استفاده می‌کند؛ بدون جایگزینی.')
+      : ('Up to '+limit+' countries share one UUID and one quota. Each country uses its current fastest healthy proxy; no fallback is used.');
+    const mode=document.getElementById('settings-exit-mode');
+    if(mode)mode.value=s.default_exit_proxy_mode||'direct';
+    /* Populate the proxy dropdowns with the managed catalog. */
+    const proxyId=document.getElementById('settings-proxy-id');
+    if(proxyId){
+      const prev=s.default_proxy_id||'';
+      proxyId.innerHTML='<option value="">— No default —</option>'+managedProxyCatalog.map(managedOption).join('');
+      if([...proxyId.options].some(o=>o.value===prev))proxyId.value=prev;
+    }
+    const tg=document.getElementById('settings-telegram-proxy');
+    if(tg){
+      const prevTg=s.telegram_default_proxy_id||'';
+      tg.innerHTML='<option value="">— Inherit the default above —</option>'+managedProxyCatalog.map(managedOption).join('');
+      if([...tg.options].some(o=>o.value===prevTg))tg.value=prevTg;
+    }
+    const customProxy=document.getElementById('settings-custom-proxy');
+    if(customProxy)customProxy.value=s.default_custom_proxy||'';
+    const dialBase=document.getElementById('settings-telegram-dial-base');
+    if(dialBase)dialBase.value=s.telegram_dial_address_base||'';
+    settingsModeChanged();
+  }catch(e){toast(e.message||'Could not load settings','err')}
+}
+async function saveSettings(){
+  const b=document.getElementById('settings-save-btn');if(!b||b.disabled)return;b.disabled=true;
+  try{
+    const body={
+      max_subscription_locations:Number(document.getElementById('settings-max-locations').value)||2,
+      default_exit_proxy_mode:document.getElementById('settings-exit-mode').value,
+      default_proxy_id:document.getElementById('settings-proxy-id').value||'',
+      default_custom_proxy:document.getElementById('settings-custom-proxy').value.trim(),
+      telegram_default_proxy_id:document.getElementById('settings-telegram-proxy').value||'',
+      telegram_dial_address_base:document.getElementById('settings-telegram-dial-base').value.trim(),
+    };
+    const r=await authF('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.detail||'Could not save settings');
+    currentSettings=d.settings;
+    toast('Settings saved ✓','ok');
+    await loadSettings();
+  }catch(e){toast(e.message||'Could not save settings','err')}finally{b.disabled=false}
+}
 
 function setQuota(val,unit,el){
   document.getElementById('nl-val').value = val===0?'':val;
@@ -3051,6 +3239,19 @@ function endpointChoiceChanged(kind){
   if(custom)setTimeout(()=>document.getElementById('nl-'+kind+'-custom').focus(),0);
   updateEndpointPreview();
 }
+
+function sniModeChanged(){
+  const mode=document.getElementById('nl-sni-mode').value;
+  const off=document.getElementById('nl-sni-off-row');
+  if(mode==='off'){
+    document.getElementById('nl-sni').value='__auto__';
+    endpointChoiceChanged('sni');
+    if(off)off.style.display='';
+  }else{
+    if(off)off.style.display='none';
+  }
+  updateEndpointPreview();
+}
 function isIpAddressPreview(value){
   const v=String(value||'').trim();
   return v.includes(':')||/^(?:\d{1,3}\.){3}\d{1,3}$/.test(v);
@@ -3082,7 +3283,7 @@ async function loadEndpointChoices(){
     endpointChoiceChanged('address');endpointChoiceChanged('sni');
   }catch(e){console.error(e);toast(e.message||'Endpoint list unavailable','err')}
 }
-function selectedCreateEndpoints(){return {address:endpointValue('address'),sni:endpointValue('sni')}}
+function selectedCreateEndpoints(){return {address:endpointValue('address'),sni:endpointValue('sni'),sni_mode:document.getElementById('nl-sni-mode').value||'auto'}}
 let allSubsList=[],allLinksList=[];
 async function loadLinks(){
   try{
@@ -3168,7 +3369,7 @@ async function createLink(){
   if(exit_proxy_mode==='repository'&&(!proxy_id||!proxy_test_receipt)){toast('Test the exact selected proxy before saving','err');return}
   try{
     const payload={label,remark,limit_value:val||0,limit_unit:unit,expires_days:exp||0,note,sub_id,protocol,fingerprint,ip_limit,speed_limit_value,speed_limit_unit,exit_proxy_mode,proxy_id,custom_proxy,proxy_test_receipt,uuid};
-    if(endpoint)Object.assign(payload,{alpn,port,address:endpoint.address,sni:endpoint.sni});
+    if(endpoint)Object.assign(payload,{alpn,port,address:endpoint.address,sni:endpoint.sni,sni_mode:endpoint.sni_mode});
     const r=await authF('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.detail||'Could not create config');
@@ -3197,6 +3398,8 @@ function openEditLink(uuid){
   document.getElementById('el-port').value=l.port||443;
   document.getElementById('el-address').value=l.address||'';
   document.getElementById('el-sni').value=l.sni||'';
+  const elSniMode=document.getElementById('el-sni-mode');
+  if(elSniMode)elSniMode.value=l.sni_mode||'auto';
   document.getElementById('el-exit-mode').value=l.exit_proxy_mode||'direct';document.getElementById('el-proxy-id').value=l.proxy_id||'';document.getElementById('el-custom-proxy').value=l.custom_proxy||'';proxyTestState.el={id:l.proxy_id||'',receipt:'',existing:true};const ets=document.getElementById('el-proxy-test-status');if(ets)ets.textContent=l.proxy_id?'Current saved proxy (retest only if changed)':'Test required';syncExitProxy('el');showProxyTestResult('el',l.proxy_id||'');
   document.getElementById('el-iplimit').value=l.ip_limit||0;
   if(!l.speed_limit_bytes){document.getElementById('el-speed').value='0';document.getElementById('el-speed-unit').value='MBIT';}
@@ -3219,8 +3422,9 @@ async function saveEditLink(){
   const speed_limit_unit=document.getElementById('el-speed-unit').value;
   const address=document.getElementById('el-address').value.trim();
   const sni=document.getElementById('el-sni').value.trim();
+  const sni_mode=document.getElementById('el-sni-mode').value||'auto';
   const {exit_proxy_mode,proxy_id,custom_proxy,proxy_test_receipt}=exitProxyValues('el');
-  const body={label,remark,note,limit_value:val||0,limit_unit:unit,fingerprint,alpn,port,ip_limit,speed_limit_value,speed_limit_unit,address,sni,exit_proxy_mode,proxy_id,custom_proxy,proxy_test_receipt};
+  const body={label,remark,note,limit_value:val||0,limit_unit:unit,fingerprint,alpn,port,ip_limit,speed_limit_value,speed_limit_unit,address,sni,sni_mode,exit_proxy_mode,proxy_id,custom_proxy,proxy_test_receipt};
   const existing=allLinksList.find(item=>item.uuid===uuid);if(exit_proxy_mode==='repository'&&(!existing||existing.exit_proxy_mode!=='repository'||existing.proxy_id!==proxy_id)&&!proxy_test_receipt){toast('Test the exact selected proxy before saving','err');return}
   if(exp&&Number(exp)>0)body.expires_days=Number(exp);
   try{
@@ -3461,10 +3665,17 @@ async function openMlModal(sub_id){
   openModal('modal-ml');
   if(!managedProxyCatalog.length&&proxyRepoState!=='loading')loadProxyCatalog();
 }
+function mlLimit(){
+  const n=Number(currentSettings&&currentSettings.max_subscription_locations);
+  return Number.isFinite(n)&&n>0?n:2;
+}
 async function saveMl(){
   if(!mlSubId)return;
   mlState.remark_text=document.getElementById('ml-remark').value.trim();
-  if(mlState.enabled&&mlState.locations.length!==2){toast(tr('Multi-Location requires exactly two countries'),'err');return}
+  const limit=mlLimit();
+  if(mlState.enabled&&mlState.locations.length!==limit){
+    toast(tr('Multi-Location requires exactly')+' '+toFa(limit)+' '+tr('locations'),'err');return
+  }
   const body={multi_location:{enabled:mlState.enabled,remark_text:mlState.remark_text,selection_mode:mlState.selection_mode,locations:mlState.locations.map(l=>({id:l.id||undefined,code:l.code,proxy_id:l.proxy_id,proxy_test_receipt:l.proxy_test_receipt||'',active:true}))}};
   try{
     const r=await authF('/api/subs/'+mlSubId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -3712,7 +3923,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   initCharts();
   document.getElementById('set-host').textContent=location.host;
   document.getElementById('sub-all-url')&&(document.getElementById('sub-all-url').textContent=location.protocol+'//'+location.host+'/sub-all');
-  fetchStats();fetchDefaultVless();loadEndpointChoices();loadTransportCapabilities();loadProxyCatalog();loadLinks();loadSubs();loadUpdateStatus();
+  fetchStats();fetchDefaultVless();loadEndpointChoices();loadTransportCapabilities();loadProxyCatalog();loadLinks();loadSubs();loadUpdateStatus();loadSettings();
   window.__codeDashboardPollers?.forEach(stop=>stop());window.__codeDashboardPollers=[];
   window.__codeDashboardPollers.push(startSerializedPoller(fetchStats,4000,'stats'));
   window.__codeDashboardPollers.push(startSerializedPoller(loadUpdateStatus,15*60*1000,'updater'));
@@ -3748,11 +3959,14 @@ function applyLiquidGlass(){
   document.querySelectorAll('.sidebar').forEach(el=>glassifySurface(el,{bend:0.32}));
   /* Card-like containers get glass. */
   document.querySelectorAll('.card,.metric,.vless-box,.srv-panel,.pw-panel,.update-credentials,.topbar').forEach(el=>glassifySurface(el,{bend:0.28}));
-  /* Every button and chip. */
+  /* Every button and chip. `guarded(el)` skips a surface that already has its
+     handle but re-arms one marked by a pass that ran before the module loaded. */
+  const guarded=el=>el.hasAttribute(guard[0])&&el.__glisse;
   document.querySelectorAll('button.btn,button.chip,button.lang-switch,button.theme-btn,button.logout-btn,button.repository-refresh-btn,button.nav-it').forEach(el=>{
-    if(el.hasAttribute(guard[0]))return;
+    if(guarded(el))return;
     el.setAttribute(guard[0],'');
     el.classList.add('lg-glass');
+    nameGlassBackdrop(el);
     /* A primary/filled/purple action reads as a filled glass button. */
     if(el.classList.contains('btn-p'))el.setAttribute('data-variant','filled');
     if(el.classList.contains('logout-btn'))el.setAttribute('data-destructive','');
@@ -3760,9 +3974,10 @@ function applyLiquidGlass(){
   });
   /* Inputs and selects get the glass input treatment. */
   document.querySelectorAll('input.fi,input.cp-input-full,input.modal-v2-input,input.pw-input,select.fs,select.cp-input-full,input.endpoint-ltr').forEach(el=>{
-    if(el.hasAttribute(guard[0]))return;
+    if(guarded(el))return;
     el.setAttribute(guard[0],'');
     el.classList.add('lg-glass');
+    nameGlassBackdrop(el);
     if(window.__glisseModule&&window.__glisseModule.useRefraction){try{el.__glisse=window.__glisseModule.useRefraction(el)}catch(_){}}
   });
   /* The active nav item carries the selection lens. */
@@ -3772,9 +3987,13 @@ function applyLiquidGlass(){
   });
 }
 function glassifySurface(el,opts={}){
-  if(!el||el.__glIsGlass)return null;
+  if(!el)return null;
+  // Skip only when this surface already has its handle: a pass that ran before
+  // the module loaded leaves the class but no handle, and must be re-armed.
+  if(el.__glIsGlass&&el.__glisse)return null;
   el.__glIsGlass=true;
   el.classList.add('lg-glass');
+  nameGlassBackdrop(el);
   if(opts.bend!=null)el.style.setProperty('--lg-glass-bend',String(opts.bend));
   if(opts.dispersion!=null)el.style.setProperty('--lg-glass-dispersion',String(opts.dispersion));
   if(window.__glisseModule&&window.__glisseModule.useRefraction){try{el.__glisse=window.__glisseModule.useRefraction(el)}catch(_){}}
@@ -3782,7 +4001,15 @@ function glassifySurface(el,opts={}){
 }
 /* Re-apply to surfaces added by a page render (the grids are rebuilt). */
 const _glassReapply=()=>{try{applyLiquidGlass()}catch(_){}};
-window.addEventListener('glisse:ready',_glassReapply);
+/* The module can arrive after the first pass: clear the class-only guards so
+   the second pass installs the refraction handles it could not the first time. */
+const _glassReapplyLate=()=>{
+  if(window.__glisseModule)document.querySelectorAll('[data-gl-is-glass]').forEach(el=>{
+    if(!el.__glisse)el.removeAttribute('data-gl-is-glass');
+  });
+  _glassReapply();
+};
+window.addEventListener('glisse:ready',()=>{try{_glassReapplyLate()}catch(_){}});
 document.addEventListener('glisse:rerender',_glassReapply);
 </script>
 </body></html>"""
